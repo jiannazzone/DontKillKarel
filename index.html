@@ -1,0 +1,308 @@
+
+<html>
+<head>
+  <title>Don't Kill Karel</title>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+  <script type="text/javascript" src="https://static.codehs.com/gulp/5ffa937a8cd47bbb9a3f20c0f45e8d09ae5fddd5/chs-js-lib/chs.js"></script>
+
+
+  <style>
+  canvas {
+    border: 1px solid black;
+    display: inline-block;
+    vertical-align: top;
+  }
+
+</style>
+
+</head>
+
+<body>
+  <h1>Don't Kill Karel</h1>
+
+
+
+  <canvas
+  width="400"
+  height="500"
+  class="codehs-editor-canvas"></canvas>
+  <pre id="console"></pre>
+
+  <script>
+  window.onload = function() {
+
+    var height = 500;
+    var width = height*(4/3);
+
+    setSize(width, height);
+    setBackgroundColor("#86a6f7");
+
+    // KAREL
+    var karel;
+    var karelURL = "assets/karel.png";
+    var karelSize = height/12;
+    var karelSpeed = 3;
+    var dx = 0;
+    var dy = 0;
+    var hitBoxBuffer = 5;
+
+    // BULLET BILLS
+    var bulletBillURL = "assets/bulletBill.png";
+    var bulletRange = [height/20, height/8];
+    var bulletSpeed = 5;
+    var bullets = [];
+
+    // DECORATIONS
+    var scoreBarHeight = height/15;
+    var buffer = width/20;
+
+    var explosion = new WebImage("assets/explosion.gif");
+    explosion.setSize(karelSize, 1.41*karelSize);
+
+    var fontSize = "16pt Arial";
+    var startText;
+    var deadText = new Text("You killed Karel! Press SPACE to play again.", fontSize);
+    deadText.setPosition((width - deadText.getWidth())/2, scoreBarHeight + buffer + deadText.getHeight());
+    var scoreText;
+
+    var wilhelm = new Audio("assets/wilhelm.mp3");
+    var music = new Audio("assets/smash_theme.mp3");
+
+    // GAME EXECUTION
+    var isPaused = true;
+    var score = 0;
+
+    function start() {
+      initialSetup();
+      keyDownMethod(keyDown);
+      keyUpMethod(keyUp);
+
+      setTimer(draw, 1);
+      setTimer(generateBullets, 200);
+    }
+
+    function draw() {
+
+      if (!isPaused) {
+        checkCollision();
+        checkEdges();
+        karel.move(dx, dy);
+
+        for (i = 0; i < bullets.length; i++) {
+          if (bullets[i].getX() < -bullets[i].getWidth()) {
+            bullets.remove(i);
+          }
+          if (bullets[i] != null) {
+            bullets[i].move(-bulletSpeed, 0);
+          }
+        }
+
+        score++;
+        scoreText.setText("Score: " + score);
+        scoreText.setPosition(width - buffer - scoreText.getWidth(),
+        scoreBarHeight - scoreText.getHeight()/2);
+      }
+    }
+
+    // Graphics
+    function initialSetup() {
+      karel = new WebImage(karelURL);
+      karel.setSize(karelSize, karelSize);
+      karel.setPosition(2*karelSize, height/2 - karelSize);
+      add(karel);
+
+      var scoreBar = new Rectangle(width, scoreBarHeight);
+      scoreBar.setColor(Color.grey);
+      add(scoreBar);
+
+      var titleText = new Text("Don't Kill Karel", fontSize);
+      titleText.setPosition(buffer,
+        scoreBarHeight - titleText.getHeight()/2);
+        add(titleText);
+
+        scoreText = new Text("Score: " + score, fontSize);
+        scoreText.setPosition(width - buffer - scoreText.getWidth(),
+        scoreBarHeight - scoreText.getHeight()/2);
+        add(scoreText);
+
+        startText = new Text("Dodge Bullet Bill. Press SPACE to begin.",
+        fontSize);
+        startText.setPosition(width/2 - startText.getWidth()/2,
+        scoreBarHeight + buffer + startText.getHeight());
+        add(startText);
+
+      }
+      function makeBullet() {
+        var bulletHeight = Randomizer.nextInt(bulletRange[0], bulletRange[1]);
+        var bulletWidth = bulletHeight*(979/608);
+        var bulletY = Randomizer.nextInt(scoreBarHeight, height - bulletHeight);
+
+        var bullet = new WebImage(bulletBillURL);
+        bullet.setSize(bulletWidth, bulletHeight);
+        bullet.setPosition(width, bulletY);
+        bullets.push(bullet);
+        add(bullet);
+
+      }
+
+      // Game Logic
+      function generateBullets() {
+        if (!isPaused && Randomizer.nextInt(1,5) > 2) {
+          makeBullet();
+        }
+      }
+      function checkCollision() {
+        var elemArray = generateHitBox();
+
+        for (var j = 0; j < elemArray.length; j++) {
+          for (var i = 0; i < bullets.length; i++) {
+            if (elemArray[j] == bullets[i]) {
+
+              music.pause();
+              wilhelm.play();
+              explosion.setPosition(karel.getX(), karel.getY());
+              add(explosion)
+              add(deadText);
+
+              isPaused = true;
+            }
+          }
+        }
+
+      }
+      function generateHitBox() {
+        var elemArray = [];
+        var numOfPoints = 5;
+
+        // Right Side
+        var elemY = karel.getY();
+        for (i = 0; i < numOfPoints; i++) {
+          var thisElem = getElementAt(karel.getX() + karelSize - hitBoxBuffer,
+          elemY);
+          elemArray.push(thisElem);
+          elemY += karelSize/numOfPoints;
+        }
+
+        // Left Side
+        var elemY = karel.getY();
+        for (i = 0; i < numOfPoints; i++) {
+          var thisElem = getElementAt(karel.getX() + hitBoxBuffer,
+          elemY);
+          elemArray.push(thisElem);
+          elemY += karelSize/numOfPoints;
+        }
+
+        // Top Side
+        var elemX = karel.getX();
+        for (i = 0; i < numOfPoints; i++) {
+          var thisElem = getElementAt(elemX,
+            karel.getY() + hitBoxBuffer);
+            elemArray.push(thisElem);
+            elemX += karelSize/numOfPoints;
+          }
+
+          // Bottom Side
+          var elemX = karel.getX();
+          for (i = 0; i < numOfPoints; i++) {
+            var thisElem = getElementAt(elemX,
+              karel.getY() + karelSize - hitBoxBuffer);
+              elemArray.push(thisElem);
+              elemX += karelSize/numOfPoints;
+            }
+
+            return elemArray;
+
+          }
+          function checkEdges() {
+            var karelX = karel.getX();
+            var karelY = karel.getY();
+
+            // Left Edge
+            if (karelX < 0) {
+              karel.setPosition(0, karelY);
+            }
+            // Top Edge
+            if (karelY < scoreBarHeight) {
+              karel.setPosition(karelX, scoreBarHeight);
+            }
+            // Right Edge
+            if (karelX > width - karelSize) {
+              karel.setPosition(width - karelSize, karelY);
+            }
+            // Bottom Edge
+            if (karelY > height - karelSize) {
+              karel.setPosition(karelX, height - karelSize);
+            }
+          }
+
+          // Controls
+          function keyDown(e) {
+            if (e.keyCode == Keyboard.letter("W")) {
+              // dx = 0;
+              dy = -karelSpeed;
+              karel.setRotation(-90, 0);
+            }
+            if (e.keyCode == Keyboard.letter("S")) {
+              // dx = 0;
+              dy = karelSpeed;
+              karel.setRotation(90, 0);
+            }
+            if (e.keyCode == Keyboard.letter("A")) {
+              dx = -karelSpeed;
+              // dy = 0;
+              karel.setRotation(180, 0);
+            }
+            if (e.keyCode == Keyboard.letter("D")) {
+              dx = karelSpeed;
+              // dy = 0;
+              karel.setRotation(0, 0);
+            }
+
+            if (e.keyCode == Keyboard.SPACE) {
+
+              if (score > 0 && isPaused) {
+                music.pause();
+                for (var i = 0; i < bullets.length; i++) {
+                  remove(bullets[i])
+                };
+                bullets = [];
+                score = 0;
+
+                // Reset screen
+                removeAll();
+                setBackgroundColor("#86a6f7");
+                initialSetup();
+              }
+
+              music.play()
+              music.loop = true;
+              startText.setText("")
+              isPaused = false;
+            }
+          }
+          function keyUp(e) {
+            if (e.keyCode == Keyboard.letter("W")) {
+              dy = 0;
+            }
+            if (e.keyCode == Keyboard.letter("S")) {
+              dy = 0;
+            }
+            if (e.keyCode == Keyboard.letter("A")) {
+              dx = 0;
+            }
+            if (e.keyCode == Keyboard.letter("D")) {
+              dx = 0;
+            }
+          }
+
+
+          if (typeof start === 'function') {
+            start();
+          }
+        };
+        </script>
+
+      </body>
+      </html>
